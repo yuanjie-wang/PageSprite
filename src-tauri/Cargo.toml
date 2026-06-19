@@ -1,0 +1,25 @@
+[package]
+name = "pagesprite"
+version = "0.1.0"
+description = "AI-powered static page generator with annotation feedback"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "pagesprite_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["stream", "json"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+futures-util = "0.3"
+dirs = "5"
+which = "6"
