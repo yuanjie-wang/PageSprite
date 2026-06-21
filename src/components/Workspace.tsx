@@ -1050,8 +1050,8 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
         title={`Region ${annotation.id}`}
         style={{
-          width: "100%",
-          height: "100%",
+          width: docW,
+          height: docH,
           border: annotation.generatedCode ? "none" : "1px solid color-mix(in srgb, var(--border) 50%, var(--text-secondary))",
           background: "var(--bg-surface)",
           pointerEvents: currentTool === "cursor" ? "auto" : "none",
