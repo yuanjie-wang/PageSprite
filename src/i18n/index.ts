@@ -65,7 +65,7 @@ const translations: Translations = {
   // Settings dialog — basic
   language: { zh: "语言 / Language", en: "Language" },
   theme: { zh: "主题 / Theme", en: "Theme" },
-  langZh: { zh: "中文", en: "Chinese" },
+  langZh: { zh: "中文", en: "中文" },
   langEn: { zh: "English", en: "English" },
   themeLight: { zh: "浅色 / Light", en: "Light" },
   themeDark: { zh: "深色 / Dark", en: "Dark" },
