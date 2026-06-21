@@ -34,6 +34,7 @@
   "build": {
     "appId": "com.pagesprite.desktop",
     "productName": "PageSprite",
+    "compression": "maximum",
     "directories": {
       "output": "release"
     },
@@ -46,7 +47,8 @@
       "target": "nsis"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "artifactName": "${productName}-${version}-mac.${ext}"
     },
     "linux": {
       "target": "AppImage"
