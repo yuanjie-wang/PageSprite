@@ -30,7 +30,7 @@ jobs:
       - run: npm ci
 
       - name: Build
-        run: npm run electron:build
+        run: npm run electron:build -- --publish=never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
