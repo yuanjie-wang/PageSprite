@@ -36,6 +36,7 @@ app.whenReady().then(() => {
   registerWorkspaceHandlers();
   registerProjectHandlers();
   registerCancelHandlers();
+
   runStartupHooks();
   createWindow();
 

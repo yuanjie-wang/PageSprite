@@ -36,6 +36,8 @@ User draws rect → Zustand store → types prompt in RegionConfig panel
 | `components/Layout.tsx` | Simple full-height wrapper around Workspace |
 | `components/ErrorBoundary.tsx` | Class-based React error boundary wrapping the workspace |
 | `components/Grainient` | OGL-based WebGL gradient animation (3rd party component via .d.ts) |
+| `components/LeftAnnotationToolbar.tsx` | Floating toolbar on selected rect's left edge — annotation drawing tools (pen/arrow/rect/ellipse), color picker, export HTML/PNG, delete, reset |
+| `components/ZoomControls.tsx` | Fixed bottom-right zoom (±10%), 1:1 reset, and center-view button |
 | `stores/chatStore.ts` | Zustand v5 store: annotations, messages, settings, streaming state; auto-persist (800ms debounce) |
 | `hooks/useAnnotations.ts` | Canvas drawing logic: tool state machine, coordinate transforms, annotation creation, `drawAnnotation()` |
 | `hooks/useAgentManager.ts` | Wraps `window.electronAPI.agent.generate()` — singleton reference across renders |
@@ -56,10 +58,18 @@ User draws rect → Zustand store → types prompt in RegionConfig panel
 | `ai/agent.js` | `agent:generate` dispatcher — streaming (tool-use API with read/write/finish tools) vs CLI agents (spawn) |
 | `ipc/settings.js` | Read/write `~/.pagesprite/settings.json` with defaults |
 | `ipc/workspace.js` | Read/write `~/.pagesprite/workspace.json`, temp dir cleanup |
-| `ipc/project.js` | File dialog save/open for `.pagesprite.json` project files |
+| `ipc/project.js` | Native file dialog save/open for `.pagesprite.json` project files |
 | `ipc/cancel.js` | `CancelManager` singleton — `AbortController` map + `ChildProcess` map |
 | `ipc/hooks.js` | Startup hook runner — `spawnSync` scripts from `settings.json` `hooks.startup` array |
 | `assets/fontawesome.js` | Reads Font Awesome from node_modules, replaces font file URLs with base64 data URIs, caches result |
+
+### I18n
+
+`src/i18n/index.ts` — Chinese (`zh`) / English (`en`). Flat translate map keyed by string ID. `useT()` hook reads current language from the zustand store. `tStatic()` for usage outside React. Language is persisted in `~/.pagesprite/settings.json`.
+
+### Theme System
+
+CSS custom properties in `src/App.css`. `data-theme="light"` / `data-theme="dark"` on `<html>` toggles all variables (`--bg-primary`, `--text-secondary`, `--border`, `--dot-color`, etc.). Applied reactively in `App.tsx` on every settings.theme change.
 
 ### Two-tier Annotation System
 
@@ -86,6 +96,12 @@ Work directory: `~/.pagesprite/tmp/<rect_id>/` — contains `index.html` (existi
 - **Font Awesome**: Bundled offline via `fontawesome.js` — reads from node_modules, base64-encodes webfonts, injects into all generated HTML.
 - **Iframe mask**: Transparent mask over each per-rect iframe. In pan mode: intercepts all events. In cursor mode: passes events through so generated content is interactable.
 - **Iframe reset**: Per-rect iframe key includes a version counter (`iframeResetVersions`) — incrementing it forces React to remount the iframe, reloading srcdoc from scratch.
+- **Per-rect canvas overlay**: Each rect has a `<canvas>` overlay on top of its iframe for drawing child annotations (pen, arrow, rect, etc.). Only renders when the rect has annotations or is selected. Coordinates are in document space, transformed by current pan/zoom.
+- **Snapping**: `snapMove()` snaps left/right/center/top/bottom edges while dragging rects; `snapResize()` snaps active edges + matches width/height to sibling rects (6px threshold). Snap guides rendered as blue `SnapLine[]` lines.
+- **Content type selector**: RegionConfig panel includes a content type selector (Phone App / Tablet App / Web / Free) that sets `promptWidth`/`promptHeight` on the annotation to constrain generated content dimensions.
+- **Export per rect**: Via LeftAnnotationToolbar — Download HTML (writes standalone `.html` via file dialog) and Download Image (renders iframe to PNG via `html-to-image`'s `toPng`).
+- **Agent progress streaming**: CLI agents stream `stdout`/`stderr` to renderer via `webContents.send("agent:progress", ...)`. Renderer subscribes via `window.electronAPI.onProgress(callback)`.
+- **Undo/redo**: Simple array-based — undo pops the last annotation and buffers it internally; redo pushes it back. Cleared on new draw.
 
 ### TypeScript Config
 

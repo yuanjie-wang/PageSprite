@@ -82,10 +82,10 @@ export default function LeftAnnotationToolbar({
         alignItems: "center",
         gap: 3,
         padding: 6,
-        background: "rgba(240, 240, 240, 0.6)",
+        background: "color-mix(in srgb, var(--bg-tertiary) 80%, transparent)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(0, 0, 0, 0.06)",
+        border: "1px solid var(--border)",
         borderRadius: 12,
         boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
       }}
@@ -107,7 +107,7 @@ export default function LeftAnnotationToolbar({
         <ArrowUpRight size={15} />
       </ToolButton>
 
-      <div style={{ width: "80%", height: 1, background: "#d4d4d4", margin: "3px 0" }} />
+      <div style={{ width: "80%", height: 1, background: "var(--border)", margin: "3px 0" }} />
 
       {/* Color picker */}
       <div ref={leftColorRef} style={{ position: "relative" }}>
@@ -135,10 +135,10 @@ export default function LeftAnnotationToolbar({
               transform: "translateY(-50%)",
               marginLeft: 8,
               display: "flex", gap: 3, padding: 6,
-              background: "rgba(240, 240, 240, 0.85)",
+              background: "color-mix(in srgb, var(--bg-secondary) 95%, transparent)",
               backdropFilter: "blur(16px)",
               WebkitBackdropFilter: "blur(16px)",
-              border: "1px solid rgba(0,0,0,0.08)",
+              border: "1px solid var(--border)",
               borderRadius: 10,
               boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
               zIndex: 20,
@@ -160,7 +160,7 @@ export default function LeftAnnotationToolbar({
         )}
       </div>
 
-      <div style={{ width: "80%", height: 1, background: "#d4d4d4", margin: "3px 0" }} />
+      <div style={{ width: "80%", height: 1, background: "var(--border)", margin: "3px 0" }} />
 
       {/* Reset */}
       <ToolButton onClick={onResetRect} title={t("reset")}>
@@ -177,7 +177,7 @@ export default function LeftAnnotationToolbar({
             display: "flex", alignItems: "center", justifyContent: "center",
             border: "none", borderRadius: 6,
             background: "transparent",
-            color: selAnn.generatedCode ? "#555" : "#bbb",
+            color: selAnn.generatedCode ? "var(--text-secondary)" : "var(--text-muted)",
             opacity: selAnn.generatedCode ? 1 : 0.4,
             cursor: selAnn.generatedCode ? "pointer" : "default",
           }}
@@ -193,10 +193,10 @@ export default function LeftAnnotationToolbar({
                 left: "50%", bottom: "100%",
                 transform: "translateX(-50%)",
                 marginBottom: 6,
-                background: "rgba(255,255,255,0.95)",
+                background: "color-mix(in srgb, var(--bg-secondary) 98%, transparent)",
                 backdropFilter: "blur(12px)",
                 WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(0,0,0,0.08)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
                 zIndex: 20,
@@ -219,7 +219,7 @@ export default function LeftAnnotationToolbar({
       </div>
 
       {/* Delete */}
-      <ToolButton onClick={() => onDeleteRect(selectedRectId)} title={t("delete")} color="#ef4444">
+      <ToolButton onClick={() => onDeleteRect(selectedRectId)} title={t("delete")}>
         <Trash2 size={15} />
       </ToolButton>
     </div>
@@ -239,8 +239,8 @@ function ToolButton({ active, onClick, title, children, color }: {
         width: 30, height: 30,
         display: "flex", alignItems: "center", justifyContent: "center",
         border: "none", borderRadius: 6,
-        background: active ? "#d0d0d0" : "transparent",
-        color: color ?? (active ? "#222" : "#666"),
+        background: active ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "transparent",
+        color: color ?? (active ? "var(--accent)" : "var(--text-secondary)"),
         cursor: "pointer",
       }}
     >
@@ -263,9 +263,9 @@ function ExportButton({ onClick, children, borderTop }: {
         display: "flex", alignItems: "center", gap: 6,
         padding: "6px 12px",
         border: "none",
-        borderTop: borderTop ? "1px solid rgba(0,0,0,0.06)" : "none",
-        background: hover ? "rgba(0,0,0,0.04)" : "transparent",
-        color: "#444",
+        borderTop: borderTop ? "1px solid var(--border)" : "none",
+        background: hover ? "color-mix(in srgb, var(--bg-tertiary) 50%, transparent)" : "transparent",
+        color: "var(--text-primary)",
         fontSize: 12,
         cursor: "pointer",
         whiteSpace: "nowrap",

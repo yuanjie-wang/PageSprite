@@ -17,6 +17,7 @@ const translations: Translations = {
   zoomOut: { zh: "缩小", en: "Zoom Out" },
   zoomIn: { zh: "放大", en: "Zoom In" },
   resetZoom: { zh: "重置缩放", en: "Reset Zoom" },
+  resetView: { zh: "回到工作区中心", en: "Reset View" },
 
   // Annotation toolbar
   rectangle: { zh: "矩形", en: "Rectangle" },
@@ -96,6 +97,14 @@ const translations: Translations = {
   generatingHtmlSub: { zh: "正在生成HTML...", en: "Generating HTML..." },
   stylingSub: { zh: "正在优化样式...", en: "Polishing style..." },
   finishingSub: { zh: "正在收尾...", en: "Finalizing..." },
+
+  // Region config
+  contentType: { zh: "内容类型", en: "Content Type" },
+  phoneApp: { zh: "手机App", en: "Phone App" },
+  tabletApp: { zh: "平板App", en: "Tablet App" },
+  web: { zh: "网页", en: "Web" },
+  free: { zh: "自由", en: "Free" },
+  shiftEnterHint: { zh: "Shift+Enter 换行", en: "Shift+Enter new line" },
 
   // Workspace — misc
   close: { zh: "关闭", en: "Close" },

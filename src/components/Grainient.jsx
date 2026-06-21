@@ -186,8 +186,8 @@ const Grainient = ({
 
     const setSize = () => {
       const rect = container.getBoundingClientRect();
-      const w = Math.max(1, Math.floor(rect.width));
-      const h = Math.max(1, Math.floor(rect.height));
+      const w = Math.max(1, Math.ceil(rect.width));
+      const h = Math.max(1, Math.ceil(rect.height));
       renderer.setSize(w, h);
       const res = program.uniforms.iResolution.value;
       res[0] = gl.drawingBufferWidth;

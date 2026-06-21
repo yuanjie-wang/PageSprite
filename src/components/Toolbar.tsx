@@ -38,8 +38,8 @@ export default function Toolbar({
         alignItems: "center",
         gap: 3,
         padding: "0 10px",
-        background: floating ? "transparent" : "#f0f0f0",
-        borderBottom: floating ? "none" : "1px solid #d4d4d4",
+        background: floating ? "transparent" : "color-mix(in srgb, var(--bg-tertiary) 80%, transparent)",
+        borderBottom: floating ? "none" : "1px solid var(--border)",
         flexShrink: 0,
       }}
     >
@@ -51,8 +51,8 @@ export default function Toolbar({
           width: 30, height: 30,
           display: "flex", alignItems: "center", justifyContent: "center",
           border: "none", borderRadius: 6,
-          background: currentTool === "cursor" ? "#d0d0d0" : "transparent",
-          color: currentTool === "cursor" ? "#222" : "#666",
+          background: currentTool === "cursor" ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "transparent",
+          color: currentTool === "cursor" ? "var(--accent)" : "var(--text-secondary)",
         }}
       >
         <MousePointer2 size={15} />
@@ -65,13 +65,13 @@ export default function Toolbar({
           width: 30, height: 30,
           display: "flex", alignItems: "center", justifyContent: "center",
           border: "none", borderRadius: 6,
-          background: currentTool === "pan" ? "#d0d0d0" : "transparent",
-          color: currentTool === "pan" ? "#222" : "#666",
+          background: currentTool === "pan" ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "transparent",
+          color: currentTool === "pan" ? "var(--accent)" : "var(--text-secondary)",
         }}
       >
         <Hand size={15} />
       </button>
-      <div style={{ width: 1, height: 16, background: "#d4d4d4", margin: "0 4px" }} />
+      <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
       {/* Rect */}
       <button
         onClick={() => onToolChange("rect")}
@@ -80,13 +80,13 @@ export default function Toolbar({
           width: 30, height: 30,
           display: "flex", alignItems: "center", justifyContent: "center",
           border: "none", borderRadius: 6,
-          background: currentTool === "rect" ? "#d0d0d0" : "transparent",
-          color: currentTool === "rect" ? "#222" : "#666",
+          background: currentTool === "rect" ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "transparent",
+          color: currentTool === "rect" ? "var(--accent)" : "var(--text-secondary)",
         }}
       >
         <SquarePlus size={15} />
       </button>
-      <div style={{ width: 1, height: 16, background: "#d4d4d4", margin: "0 4px" }} />
+      <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
       <div style={{ flex: 1 }} />
 
       <button
@@ -102,7 +102,7 @@ export default function Toolbar({
           border: "none",
           borderRadius: 6,
           background: "transparent",
-          color: hasUndo ? "#555" : "#bbb",
+          color: hasUndo ? "var(--text-secondary)" : "var(--text-muted)",
           opacity: hasUndo ? 1 : 0.4,
         }}
       >
@@ -122,7 +122,7 @@ export default function Toolbar({
           border: "none",
           borderRadius: 6,
           background: "transparent",
-          color: hasRedo ? "#555" : "#bbb",
+          color: hasRedo ? "var(--text-secondary)" : "var(--text-muted)",
           opacity: hasRedo ? 1 : 0.4,
         }}
       >
@@ -142,14 +142,14 @@ export default function Toolbar({
           border: "none",
           borderRadius: 6,
           background: "transparent",
-          color: hasContent ? "#555" : "#bbb",
+          color: hasContent ? "var(--text-secondary)" : "var(--text-muted)",
           opacity: hasContent ? 1 : 0.4,
         }}
       >
         <Trash2 size={15} />
       </button>
 
-      <div style={{ width: 1, height: 16, background: "#d4d4d4", margin: "0 4px" }} />
+      <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
       <button
         onClick={onSettingsOpen}
         title={t("apiSettings")}
@@ -162,7 +162,7 @@ export default function Toolbar({
           border: "none",
           borderRadius: 6,
           background: "transparent",
-          color: hasApiKey ? "#666" : "#e67e22",
+          color: hasApiKey ? "var(--text-secondary)" : "var(--warning)",
         }}
       >
         {hasApiKey ? <Settings size={15} /> : <TriangleAlert size={15} />}

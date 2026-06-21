@@ -87,7 +87,10 @@ export function useAnnotations(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   scrollOffsetRef: React.RefObject<{ x: number; y: number } | null>,
   transformRef: React.RefObject<ViewTransform | null>,
+  callbacks?: { onDeselectRect?: () => void },
 ) {
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
   const [currentTool, setCurrentTool] = useState<ToolType>("pan");
   const [currentColor, setCurrentColor] = useState("#ff0000");
   const [pendingText, setPendingText] = useState<PendingText | null>(null);
@@ -154,7 +157,11 @@ export function useAnnotations(
       if (currentTool === "text") {
         const rawPos = canvasToDoc(pos.x, pos.y, t, scroll);
         const docPos = clampToRect(rawPos);
-        if (!isInsideAnyRect(rawPos)) return;
+        if (!isInsideAnyRect(rawPos)) {
+          callbacksRef.current?.onDeselectRect?.();
+          setCurrentTool("cursor");
+          return;
+        }
         setPendingText({ x: docPos.x, y: docPos.y });
         return;
       }
@@ -163,7 +170,10 @@ export function useAnnotations(
 
       // Annotation tools (pen, arrow, rectangle, ellipse, highlight, text) may only
       // start inside a rect — reject draws that begin outside.
+      // Clicking empty space also deselects and switches to cursor.
       if (currentTool !== "cursor" && currentTool !== "rect" && !isInsideAnyRect(rawPos)) {
+        callbacksRef.current?.onDeselectRect?.();
+        setCurrentTool("cursor");
         return;
       }
 
@@ -171,7 +181,7 @@ export function useAnnotations(
       startPointRef.current = docPos;
       currentPathRef.current = [docPos];
     },
-    [currentTool, getCanvasPos, pendingText, pendingNote, transformRef, scrollOffsetRef],
+    [currentTool, getCanvasPos, pendingText, pendingNote, transformRef, scrollOffsetRef, setCurrentTool],
   );
 
   const handleTextSubmit = useCallback(
@@ -236,10 +246,14 @@ export function useAnnotations(
       ctx.scale(t.zoom, t.zoom);
       ctx.translate(-scroll.x, -scroll.y);
       const annotations = useChatStore.getState().annotations;
+      const clipY = {
+        minY: (-t.panY) / t.zoom + scroll.y,
+        maxY: (-t.panY + canvas.height) / t.zoom + scroll.y,
+      };
       annotations
         .filter(a => !a.parentId)
         .forEach((ann, i) => {
-          drawAnnotation(ctx, ann, i + 1);
+          drawAnnotation(ctx, ann, i + 1, clipY);
         });
       ctx.restore();
 
@@ -482,7 +496,10 @@ export function useAnnotations(
           },
         ]);
       } else {
-        // Compute note popup position in viewport (canvas) coords
+        // Compute note popup position in viewport (canvas) coords.
+        // If the popup would extend beyond the bottom of the viewport,
+        // position it above the annotation instead.
+        const POPUP_H = 130;
         let noteX: number;
         let noteY: number;
         if (annotation.boundingBox) {
@@ -490,7 +507,9 @@ export function useAnnotations(
             annotation.boundingBox.x, annotation.boundingBox.y, t, scroll,
           );
           noteX = topLeft.x + annotation.boundingBox.width * t.zoom / 2 - 100;
-          noteY = topLeft.y + annotation.boundingBox.height * t.zoom + 10;
+          const below = topLeft.y + annotation.boundingBox.height * t.zoom + 10;
+          const above = topLeft.y - POPUP_H - 5;
+          noteY = (below + POPUP_H > window.innerHeight && above > 0) ? above : below;
         } else if (annotation.points.length > 0) {
           const lastPt = docToCanvas(
             annotation.points[annotation.points.length - 1].x,
@@ -498,7 +517,12 @@ export function useAnnotations(
             t, scroll,
           );
           noteX = lastPt.x + 10;
-          noteY = lastPt.y + 10;
+          const below = lastPt.y + 10;
+          const firstPt = docToCanvas(
+            annotation.points[0].x, annotation.points[0].y, t, scroll,
+          );
+          const above = firstPt.y - POPUP_H - 5;
+          noteY = (below + POPUP_H > window.innerHeight && above > 0) ? above : below;
         } else {
           noteX = 20;
           noteY = 20;
@@ -539,6 +563,7 @@ export function useAnnotations(
   }, []);
 
   const setTool = useCallback((tool: ToolType) => {
+    console.log("[cursor] setTool", tool, "at", new Date().toISOString().slice(11, 23));
     setCurrentTool(tool);
     setPendingText(null);
     setPendingNote(null);
@@ -584,6 +609,7 @@ export function drawAnnotation(
   ctx: CanvasRenderingContext2D,
   ann: Annotation,
   index?: number,
+  clipY?: { minY: number; maxY: number },
 ) {
   try {
   ctx.save();
@@ -682,7 +708,7 @@ export function drawAnnotation(
 
   // Draw modification note badge if present (for non-text, non-rect annotations)
   if (ann.text && ann.type !== "text" && ann.type !== "rect") {
-    drawNoteBadge(ctx, ann);
+    drawNoteBadge(ctx, ann, clipY);
   }
 
   // Draw number badge on top (after shape, so not obscured; skip rect type)
@@ -747,27 +773,50 @@ function roundRect(
   ctx.closePath();
 }
 
-function drawNoteBadge(ctx: CanvasRenderingContext2D, ann: Annotation) {
-  let bx: number;
-  let by: number;
-  if (ann.boundingBox) {
-    bx = ann.boundingBox.x + ann.boundingBox.width / 2;
-    by = ann.boundingBox.y + ann.boundingBox.height + 12;
-  } else if (ann.points.length > 0) {
-    const last = ann.points[ann.points.length - 1];
-    bx = last.x + 12;
-    by = last.y + 12;
-  } else {
-    bx = 20;
-    by = 20;
-  }
-
+function drawNoteBadge(
+  ctx: CanvasRenderingContext2D,
+  ann: Annotation,
+  clipY?: { minY: number; maxY: number },
+) {
   ctx.font = "13px system-ui, -apple-system, sans-serif";
   const m = ctx.measureText(ann.text!);
   const pad = 10;
   const bw = m.width + pad * 2;
   const bh = 20 + pad * 2;
   const br = 8;
+
+  // Compute both candidate positions (above vs below)
+  let bxAbove: number, bxBelow: number;
+  let byAbove: number, byBelow: number;
+  if (ann.boundingBox) {
+    const cx = ann.boundingBox.x + ann.boundingBox.width / 2 - bw / 2;
+    bxAbove = cx;
+    bxBelow = cx;
+    byAbove = ann.boundingBox.y - 12 - bh;
+    byBelow = ann.boundingBox.y + ann.boundingBox.height + 12;
+  } else if (ann.points.length > 0) {
+    const first = ann.points[0];
+    bxAbove = first.x;
+    byAbove = first.y - 12 - bh;
+    const last = ann.points[ann.points.length - 1];
+    bxBelow = last.x + 12;
+    byBelow = last.y + 12;
+  } else {
+    bxAbove = 20; bxBelow = 20;
+    byAbove = 20; byBelow = 20;
+  }
+
+  // Choose position: prefer above if it fits within clip bounds, otherwise below
+  let bx: number, by: number;
+  if (clipY) {
+    const aboveFits = byAbove >= clipY.minY && byAbove + bh <= clipY.maxY;
+    const belowFits = byBelow >= clipY.minY && byBelow + bh <= clipY.maxY;
+    bx = aboveFits ? bxAbove : belowFits ? bxBelow : bxAbove;
+    by = aboveFits ? byAbove : belowFits ? byBelow : byAbove;
+  } else {
+    bx = bxAbove;
+    by = byAbove;
+  }
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.12)";

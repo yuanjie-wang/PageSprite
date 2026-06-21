@@ -32,8 +32,10 @@ function useIMEEnter() {
 
 const BLANK_HTML =
   '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh}</style></head><body></body></html>';
-const PER_RECT_BLANK =
-  '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh;background:#fff}</style></head><body></body></html>';
+function perRectBlank(dark: boolean): string {
+  const bg = dark ? "#1c1c1e" : "#fff";
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh;background:${bg}}</style></head><body></body></html>`;
+}
 
 /** Incremented per rect to force iframe remount on reset */
 const iframeResetVersions: Record<string, number> = {};
@@ -298,10 +300,10 @@ function RegionConfig({
   const originalBoundsRef = useRef(annotation?.boundingBox ? { ...annotation.boundingBox } : null);
 
   const CONTENT_TYPES = [
-    { key: "phoneApp", label: "手机App", width: 375, height: 812 },
-    { key: "tabletApp", label: "平板App", width: 768, height: 1024 },
-    { key: "web", label: "网页", width: 1440, height: 900 },
-    { key: "free", label: "自由", width: undefined as unknown as number, height: undefined as unknown as number },
+    { key: "phoneApp", label: "phoneApp", width: 375, height: 812 },
+    { key: "tabletApp", label: "tabletApp", width: 768, height: 1024 },
+    { key: "web", label: "web", width: 1440, height: 900 },
+    { key: "free", label: "free", width: undefined as unknown as number, height: undefined as unknown as number },
   ];
 
   // Determine content type from current bounds, or default to "web"
@@ -385,8 +387,8 @@ function RegionConfig({
           top: vp.y,
           width: vp.width,
           height: vp.height,
-          background: "#ffffff",
-          border: "1px solid #d0d0d0",
+          background: "var(--bg-surface)",
+          border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
           borderRadius: 4,
           pointerEvents: "none",
           zIndex: Z_INDEX.REGION_BG,
@@ -405,10 +407,10 @@ function RegionConfig({
             display: "flex",
             flexDirection: "column",
             gap: 8,
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            border: "1px solid rgba(0,0,0,0.08)",
+            background: "color-mix(in srgb, var(--bg-tertiary) 80%, transparent)",
+            backdropFilter: "blur(20px) saturate(1.5)",
+            WebkitBackdropFilter: "blur(20px) saturate(1.5)",
+            border: "1px solid var(--border)",
             borderRadius: 10,
             padding: "10px 12px",
             boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
@@ -422,21 +424,21 @@ function RegionConfig({
               style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: "#999",
+                color: "var(--text-muted)",
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
                 marginBottom: 6,
               }}
             >
-              内容类型
+              {t("contentType")}
             </div>
             <div style={{ display: "flex", gap: 4 }}>
-              {CONTENT_TYPES.map((t) => {
-                const active = contentType === t.key;
+              {CONTENT_TYPES.map((ct) => {
+                const active = contentType === ct.key;
                 return (
                   <button
-                    key={t.key}
-                    onClick={() => handleContentTypeClick(t)}
+                    key={ct.key}
+                    onClick={() => handleContentTypeClick(ct)}
                     style={{
                       flex: 1,
                       border: "none",
@@ -444,14 +446,14 @@ function RegionConfig({
                       padding: "5px 6px",
                       fontSize: 11,
                       fontWeight: active ? 600 : 400,
-                      color: active ? "#fff" : "#666",
-                      background: active ? "#4f8cff" : "rgba(0,0,0,0.04)",
+                      color: active ? "#fff" : "var(--text-secondary)",
+                      background: active ? "#4f8cff" : "color-mix(in srgb, var(--bg-tertiary) 50%, transparent)",
                       cursor: "pointer",
                       whiteSpace: "nowrap",
                       fontFamily: "inherit",
                     }}
                   >
-                    {t.label}
+                    {t(ct.label)}
                   </button>
                 );
               })}
@@ -464,7 +466,7 @@ function RegionConfig({
               style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: "#999",
+                color: "var(--text-muted)",
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
                 marginBottom: 6,
@@ -487,13 +489,13 @@ function RegionConfig({
                 flex: annotation?.promptWidth ? undefined : 1,
                 width: annotation?.promptWidth ? annotation.promptWidth : undefined,
                 height: annotation?.promptHeight ? annotation.promptHeight : undefined,
-                border: "1px solid rgba(0,0,0,0.12)",
+                border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
                 outline: "none",
                 borderRadius: 6,
                 padding: "6px 8px",
-                background: isBusy ? "rgba(0,0,0,0.04)" : "rgba(0,0,0,0.02)",
+                background: isBusy ? "color-mix(in srgb, var(--bg-tertiary) 20%, transparent)" : "color-mix(in srgb, var(--bg-tertiary) 10%, transparent)",
                 fontSize: 13,
-                color: isBusy ? "#aaa" : "#333",
+                color: isBusy ? "var(--text-muted)" : "var(--text-primary)",
                 fontFamily: "inherit",
                 resize: "both",
                 lineHeight: 1.5,
@@ -511,8 +513,8 @@ function RegionConfig({
                     justifyContent: "center",
                     border: "none",
                     borderRadius: 6,
-                    background: "rgba(200,50,50,0.1)",
-                    color: "#c83232",
+                    background: "color-mix(in srgb, var(--danger) 15%, transparent)",
+                    color: "var(--danger)",
                     cursor: "pointer",
                     flexShrink: 0,
                   }}
@@ -535,8 +537,8 @@ function RegionConfig({
                     justifyContent: "center",
                     border: "none",
                     borderRadius: 6,
-                    background: canGenerate ? "#4f8cff" : "rgba(0,0,0,0.06)",
-                    color: canGenerate ? "#fff" : "#bbb",
+                    background: canGenerate ? "#4f8cff" : "color-mix(in srgb, var(--bg-tertiary) 50%, transparent)",
+                    color: canGenerate ? "#fff" : "var(--text-muted)",
                     cursor: canGenerate ? "pointer" : "not-allowed",
                     flexShrink: 0,
                   }}
@@ -553,11 +555,11 @@ function RegionConfig({
               alignItems: "center",
               justifyContent: "space-between",
               fontSize: 11,
-              color: "#999",
+              color: "var(--text-muted)",
               userSelect: "none",
             }}
           >
-            <span>Shift+Enter 换行</span>
+            <span>{t("shiftEnterHint")}</span>
           </div>
         </div>
       )}
@@ -950,10 +952,10 @@ function RectTitleBar({
         alignItems: "center",
         justifyContent: "center",
         cursor: dragging ? "grabbing" : "move",
-        background: "rgba(240, 240, 240, 0.6)",
+        background: "color-mix(in srgb, var(--bg-tertiary) 80%, transparent)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(0,0,0,0.06)",
+        border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
         borderRadius: 8,
         padding: "0 8px",
         boxSizing: "border-box",
@@ -963,7 +965,7 @@ function RectTitleBar({
       <span
         style={{
           fontSize: 11,
-          color: "#000",
+          color: "var(--text-primary)",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -1016,6 +1018,7 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
   zoom: number;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const theme = useChatStore((s) => s.settings.theme);
 
   useEffect(() => {
     if (iframeRef.current) {
@@ -1026,6 +1029,7 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
 
   const docW = annotation.boundingBox?.width ?? vp.width;
   const docH = annotation.boundingBox?.height ?? vp.height;
+  const dark = theme === "dark";
 
   return (
     <div
@@ -1042,14 +1046,14 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
     >
       <iframe
         ref={iframeRef}
-        srcDoc={annotation.generatedCode ? wrapRectContent(annotation.generatedCode) : PER_RECT_BLANK}
-        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        srcDoc={annotation.generatedCode ? wrapRectContent(annotation.generatedCode) : perRectBlank(dark)}
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
         title={`Region ${annotation.id}`}
         style={{
           width: "100%",
           height: "100%",
-          border: annotation.generatedCode ? "none" : "1px solid #d0d0d0",
-          background: "#fff",
+          border: annotation.generatedCode ? "none" : "1px solid color-mix(in srgb, var(--border) 50%, var(--text-secondary))",
+          background: "var(--bg-surface)",
           pointerEvents: currentTool === "cursor" ? "auto" : "none",
           display: "block",
         }}
@@ -1088,7 +1092,7 @@ function RectAnnotationCanvas({ annotationId, zoom, panX, panY, scrollOffset, zI
   );
   const childAnnotations = useChatStore(
     useShallow((s) =>
-      s.annotations.filter((a) => a.parentId === annotationId && a.text),
+      s.annotations.filter((a) => a.parentId === annotationId),
     ),
   );
 
@@ -1126,8 +1130,9 @@ function RectAnnotationCanvas({ annotationId, zoom, panX, panY, scrollOffset, zI
       ctx.scale(zoom, zoom);
       ctx.translate(-b.x, -b.y);
 
+      const clipY = { minY: b.y, maxY: b.y + b.height };
       childAnnotations.forEach((ann, i) => {
-        drawAnnotation(ctx, ann, i + 1);
+        drawAnnotation(ctx, ann, i + 1, clipY);
       });
 
       ctx.restore();
@@ -1186,6 +1191,37 @@ function WorkspaceContent() {
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 
   const perRectIframeMapRef = useRef(new Map<string, HTMLIFrameElement>());
+
+  /** Walk a per-rect iframe's rendered DOM and collect visible element bounding boxes
+   *  relative to the region's coordinate space. Output is a structured position map
+   *  so the AI can match annotation (x,y) coordinates to specific elements. */
+  function buildElementPositionMap(iframe: HTMLIFrameElement): string {
+    const doc = iframe.contentDocument;
+    if (!doc) return "";
+    const items: string[] = [];
+    const MAX = 25;
+    function walk(el: Element) {
+      if (items.length >= MAX) return;
+      const tag = el.tagName.toLowerCase();
+      if (["script","style","link","meta"].includes(tag)) return;
+      const rect = el.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      if (w < 5 || h < 5) { for (let i = 0; i < el.children.length; i++) walk(el.children[i]); return; }
+      const x = Math.round(rect.left);
+      const y = Math.round(rect.top);
+      const text = (el.textContent || "").trim().slice(0, 50);
+      const cls = Array.from(el.classList).join(".");
+      const id = el.id ? `#${el.id}` : "";
+      if (text || ["img","svg","canvas","video","iframe"].includes(tag)) {
+        items.push(`  <${tag}${id}${cls ? "."+cls : ""}> @(${x},${y}) ${w}x${h} "${text}"`);
+      }
+      for (let i = 0; i < el.children.length; i++) walk(el.children[i]);
+    }
+    walk(doc.body);
+    return items.join("\n");
+  }
+
   const cancelledRef = useRef(new Set<string>());
   const handleCancelGeneration = useCallback((id: string) => {
     cancelledRef.current.add(id);
@@ -1230,6 +1266,12 @@ function WorkspaceContent() {
       setSelectedRectId(null);
     }
   }, [allRects, selectedRectId]);
+
+  // Auto-center view on mount
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+    setZoom(0.6);
+  }, []);
 
   // Local overlay ID list — decoupled from store for exit animation control.
   // Additions are immediate, removals are delayed by 650ms so the exit
@@ -1304,7 +1346,9 @@ function WorkspaceContent() {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
-  } = useAnnotations(canvasRef, scrollOffsetRef, transformRef);
+  } = useAnnotations(canvasRef, scrollOffsetRef, transformRef, {
+    onDeselectRect: () => setSelectedRectId(null),
+  });
 
   // Delete/Backspace removes the selected rect/annotation, Escape deselects
   // Ignore when focus is inside an input/textarea to avoid conflicting with text editing.
@@ -1330,23 +1374,19 @@ function WorkspaceContent() {
   const panX = panOffset.x;
   const panY = panOffset.y;
 
-  // Auto-select new rects when they appear and switch to cursor mode
+  // Auto-select new rects when they appear (user-drawn, not loaded from disk).
+  // Only switches to cursor mode when the user was actively drawing (currentTool === "rect"),
+  // so loading a saved workspace doesn't override the user's tool choice.
   const prevAllRectsLenRef = useRef(allRects.length);
-  const mountTimeRef = useRef(Date.now());
   useEffect(() => {
-    // Skip auto-select shortly after mount — annotations loaded from disk
-    // should not auto-select a rect.
-    if (Date.now() - mountTimeRef.current < 1500) {
-      prevAllRectsLenRef.current = allRects.length;
-      return;
-    }
     if (allRects.length > prevAllRectsLenRef.current) {
       const newRect = allRects[allRects.length - 1];
       setSelectedRectId(newRect.id);
-      setCurrentTool("cursor");
+      // Only switch to cursor if user just created a rect — preserves pan tool selection
+      if (currentTool === "rect") setCurrentTool("cursor");
     }
     prevAllRectsLenRef.current = allRects.length;
-  }, [allRects, setCurrentTool]);
+  }, [allRects, currentTool, setCurrentTool]);
 
   // Re-assert selection when tool changes — counters any unintended deselection.
   // Only re-asserts for annotation tools (pen, arrow, etc.) — rect/pan clear instead.
@@ -1376,6 +1416,10 @@ function WorkspaceContent() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const t = transformRef.current || { panX: 0, panY: 0, zoom: 1 };
       const so = scrollOffsetRef.current;
+      const clipY = {
+        minY: (-t.panY) / t.zoom + so.y,
+        maxY: (-t.panY + canvas.height) / t.zoom + so.y,
+      };
       ctx.save();
       // Manual pan/zoom transform from ref — canvas is at container level, not inside pan layer
       ctx.translate(t.panX, t.panY);
@@ -1384,7 +1428,7 @@ function WorkspaceContent() {
       annotations
         .filter(a => !a.parentId)
         .forEach((ann, i) => {
-          drawAnnotation(ctx, ann, i + 1);
+          drawAnnotation(ctx, ann, i + 1, clipY);
         });
 
       ctx.restore();
@@ -1566,7 +1610,12 @@ function WorkspaceContent() {
                 parts.push(`  Position relative to region: (${Math.round(minX - ann.boundingBox.x)}, ${Math.round(minY - ann.boundingBox.y)})`);
                 parts.push(`  Area: ${Math.round(maxX - minX)}x${Math.round(maxY - minY)}`);
                 if (a.type === "arrow" && a.points.length >= 2) {
-                  parts.push(`  Arrow from (${Math.round(a.points[0].x - ann.boundingBox.x)}, ${Math.round(a.points[0].y - ann.boundingBox.y)}) to (${Math.round(a.points[1].x - ann.boundingBox.x)}, ${Math.round(a.points[1].y - ann.boundingBox.y)})`);
+                  const p0 = a.points[0], p1 = a.points[1];
+                  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+                  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                  const tipX = p1.x + (dx / len) * 5;
+                  const tipY = p1.y + (dy / len) * 5;
+                  parts.push(`  Arrow pointing at (${Math.round(tipX - ann.boundingBox.x)}, ${Math.round(tipY - ann.boundingBox.y)})`);
                 }
               }
               if (a.text) {
@@ -1577,6 +1626,17 @@ function WorkspaceContent() {
             .join("\n\n");
       }
 
+      // Append rendered element position map when arrow annotations point at existing content
+      if (ann?.generatedCode && childAnnotations.some(a => a.type === "arrow")) {
+        const iframe = perRectIframeMapRef.current.get(annotationId);
+        if (iframe?.contentDocument) {
+          const elMap = buildElementPositionMap(iframe);
+          if (elMap) {
+            childContext += `\n\nThe following visible elements are rendered at these positions in this region (use the @(x,y) coordinates to identify which element the arrow is pointing at):\n${elMap}`;
+          }
+        }
+      }
+
       // Delete child annotations — they've been consumed by this generation
       for (const child of childAnnotations) {
         store.removeAnnotation(child.id);
@@ -1585,7 +1645,22 @@ function WorkspaceContent() {
       redoStackRef.current = [];
 
       const isRevision = !!ann?.generatedCode;
-      let fullPrompt = (isRevision ? `Revise` : `Generate`) + ` a self-contained HTML snippet that fills its container (${dims}px). The output must not include html/head/body tags — only content that fills the container. Use relative units (%, vw, vh), flexbox/grid, and avoid fixed pixel dimensions so the content adapts when the container is resized.${styleGuide} User's request: ${prompt}${childContext}`;
+      const hasAnnotations = childAnnotations.length > 0;
+      let fullPrompt: string;
+      if (isRevision && hasAnnotations) {
+        // Revision with annotation feedback — the user drew shapes on the rendered content
+        fullPrompt = `Update the existing HTML in this region (${dims}px). The user has drawn annotations on the rendered output pointing at specific elements. Your task:
+
+1. Read each annotation's note and @(x,y) position to identify which element to modify
+2. Apply ONLY the changes requested — preserve the rest of the layout and styling exactly as-is
+3. The coordinates in the annotations correspond to elements listed in the rendered element map below
+
+Output only the content that fills the container (no html/head/body tags). Use relative units, flexbox/grid, avoid fixed pixel dimensions.${styleGuide}
+
+User's request: ${prompt}${childContext}`;
+      } else {
+        fullPrompt = (isRevision ? `Revise` : `Generate`) + ` a self-contained HTML snippet that fills its container (${dims}px). The output must not include html/head/body tags — only content that fills the container. Use relative units (%, vw, vh), flexbox/grid, and avoid fixed pixel dimensions so the content adapts when the container is resized.${styleGuide} User's request: ${prompt}${childContext}`;
+      }
 
       const revHistory = store.revisionHistory[annotationId];
 
@@ -1746,10 +1821,18 @@ function WorkspaceContent() {
         // Pinch zoom — prevent default to avoid browser zoom
         e.preventDefault();
         const delta = -e.deltaY * 0.002;
-        setZoom((z) => {
-          const next = +(z * (1 + delta)).toFixed(3);
-          return Math.min(5, Math.max(0.1, next));
-        });
+        const oldZoom = transformRef.current?.zoom ?? zoom;
+        const next = +(oldZoom * (1 + delta)).toFixed(3);
+        const clamped = Math.min(5, Math.max(0.1, next));
+        // Keep point under mouse stationary
+        const scale = clamped / oldZoom;
+        const newPanX = e.clientX - scale * (e.clientX - panOffsetRef.current.x);
+        const newPanY = e.clientY - scale * (e.clientY - panOffsetRef.current.y);
+        panOffsetRef.current = { x: newPanX, y: newPanY };
+        transformRef.current = { ...transformRef.current, panX: newPanX, panY: newPanY, zoom: clamped };
+        redrawRef.current();
+        setPanOffset({ x: newPanX, y: newPanY });
+        setZoom(clamped);
         return;
       }
       // Two-finger trackpad pan
@@ -1773,6 +1856,17 @@ function WorkspaceContent() {
   const hasApiKey = !!settings.apiKey;
   const hasContent = !!generatedCode || annotations.length > 0;
 
+  // Determine cursor for the workspace container — children inherit it unless they have
+  // their own explicit cursor (e.g. buttons keep `cursor: pointer` from App.css).
+  const containerCursor =
+    currentTool === "pan" ? (isPanning ? "grabbing" : "grab") :
+    ["rect", "pen", "arrow", "rectangle", "ellipse", "highlight"].includes(currentTool) ? "crosshair" :
+    currentTool === "text" ? "text" :
+    "";
+
+  // CSS cursor inherits through the container to children — buttons keep
+  // their explicit cursor: pointer from App.css.
+
   return (
     <div style={{ position: "relative", height: "100%", background: "var(--bg-secondary)" }}>
       {/* Floating glassmorphism toolbar */}
@@ -1784,10 +1878,10 @@ function WorkspaceContent() {
           left: "50%",
           transform: "translateX(-50%)",
           zIndex: Z_INDEX.FLOATING_TOOLBAR,
-          background: "rgba(240, 240, 240, 0.6)",
+          background: "color-mix(in srgb, var(--bg-tertiary) 80%, transparent)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(0, 0, 0, 0.06)",
+          border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
           borderRadius: 20,
           boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
         }}
@@ -1812,14 +1906,14 @@ function WorkspaceContent() {
         style={{
           position: "absolute",
           inset: 0,
-          overflow: "auto",
-          overscrollBehavior: "none",
+          overflow: "hidden",
           userSelect: "none",
           WebkitUserSelect: "none",
           backgroundColor: "var(--bg-secondary)",
           backgroundImage: "radial-gradient(circle, var(--dot-color) 1px, transparent 1px)",
           backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
           backgroundPosition: `${panX}px ${panY}px`,
+          cursor: containerCursor || undefined,
         }}
       >
         <>
@@ -1860,10 +1954,10 @@ function WorkspaceContent() {
               const b = ann.boundingBox!;
               const zi = allRectZIndex.get(ann.id) ?? 10;
               const vp = {
-                x: (b.x - scrollOffset.x) * zoom + panX,
-                y: (b.y - scrollOffset.y) * zoom + panY,
-                width: b.width * zoom,
-                height: b.height * zoom,
+                x: Math.floor((b.x - scrollOffset.x) * zoom + panX) - 1,
+                y: Math.floor((b.y - scrollOffset.y) * zoom + panY) - 1,
+                width: Math.ceil(b.width * zoom) + 2,
+                height: Math.ceil(b.height * zoom) + 2,
               };
               return (
                 <div
@@ -1874,7 +1968,7 @@ function WorkspaceContent() {
                     top: vp.y,
                     width: vp.width,
                     height: vp.height,
-                    background: "#fff",
+                    background: "var(--bg-surface)",
                     borderRadius: 4,
                     overflow: "hidden",
                     zIndex: zi + 1,
@@ -1888,13 +1982,13 @@ function WorkspaceContent() {
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: "#fff",
+                      background: "var(--bg-surface)",
                     }}
                   >
                     <Grainient
-                      color1="#f4c8c8"
-                      color2="#f2f5d2"
-                      color3="#bad6ef"
+                      color1={settings.theme === "dark" ? "#4a0000" : "#f4c8c8"}
+                      color2={settings.theme === "dark" ? "#002f06" : "#f2f5d2"}
+                      color3={settings.theme === "dark" ? "#000659" : "#bad6ef"}
                       timeSpeed={3.15}
                       colorBalance={0}
                       warpStrength={1.55}
@@ -1979,8 +2073,11 @@ function WorkspaceContent() {
                 position: "absolute",
                 inset: 0,
                 zIndex: currentTool === "pan" ? 495 : Z_INDEX.CANVAS_DEFAULT,
-                pointerEvents: currentTool === "pan" ? "auto" : "none",
-                cursor: currentTool === "pan" ? (isPanning ? "grabbing" : "grab") : "default",
+                pointerEvents: (currentTool === "pan" || currentTool === "cursor") ? "auto" : "none",
+                cursor:
+                  currentTool === "pan" ? (isPanning ? "grabbing" : "grab") :
+                  currentTool === "cursor" ? "default" :
+                  "default",
               }}
               onMouseDown={handlePanMouseDown}
               onMouseMove={handlePanMouseMove}
@@ -2142,7 +2239,7 @@ function WorkspaceContent() {
               <BackgroundDeselect onDeselect={() => setSelectedRectId(null)} />
             )}
 
-            <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+            <ZoomControls zoom={zoom} onZoomChange={setZoom} onResetView={() => { setPanOffset({ x: 0, y: 0 }); setZoom(0.6); }} />
 
             {/* Snap alignment guides */}
             {snapLines.map((line, i) => {
@@ -2242,10 +2339,10 @@ function WorkspaceContent() {
             display: "flex",
             alignItems: "flex-start",
             gap: 10,
-            background: "rgba(255,255,255,0.85)",
+            background: "color-mix(in srgb, var(--bg-secondary) 85%, transparent)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(0,0,0,0.06)",
+            border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
             borderRadius: 10,
             padding: "12px 14px",
             maxWidth: 340,
@@ -2253,8 +2350,8 @@ function WorkspaceContent() {
             userSelect: "text",
           }}
         >
-          <TriangleAlert size={16} style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5, wordBreak: "break-word" }}>
+          <TriangleAlert size={16} style={{ color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, wordBreak: "break-word" }}>
             {workspaceError}
           </div>
           <button
@@ -2265,7 +2362,7 @@ function WorkspaceContent() {
               cursor: "pointer",
               padding: 0,
               flexShrink: 0,
-              color: "#999",
+              color: "var(--text-muted)",
               fontSize: 14,
               lineHeight: 1,
             }}

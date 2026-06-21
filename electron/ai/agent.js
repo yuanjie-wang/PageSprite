@@ -135,15 +135,17 @@ Workflow:
 function executeTool(name, args, dir) {
   switch (name) {
     case "read": {
+      if (!args.path) return `Error: Missing required argument "path" for read`;
       const p = path.join(dir, args.path);
       if (!fs.existsSync(p)) return `Error: File not found: ${args.path}`;
       return fs.readFileSync(p, "utf-8");
     }
     case "write": {
+      if (!args.path) return `Error: Missing required argument "path" for write`;
       const p = path.join(dir, args.path);
       fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, args.content);
-      return `OK: Written ${args.path} (${args.content.length} chars)`;
+      fs.writeFileSync(p, args.content || "");
+      return `OK: Written ${args.path} (${(args.content || "").length} chars)`;
     }
     case "list": {
       const items = fs.readdirSync(dir);
