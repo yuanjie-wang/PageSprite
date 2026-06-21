@@ -107,13 +107,13 @@ export default function SettingsDialog() {
                 onChange={(e) => setAgentType(e.target.value as AgentType)}
                 style={selectStyle}
               >
-                <option value="streaming">流式 API (内置)</option>
+                <option value="streaming">内置Agent</option>
                 <option value="opencode">OpenCode CLI</option>
                 <option value="claude">Claude Code CLI</option>
                 <option value="custom">自定义</option>
               </select>
               <div style={{ fontSize: 11, color: "#888", marginTop: 4, lineHeight: 1.5 }}>
-                {agentType === "streaming" && "通过配置的 API 端点直接生成代码，无需额外安装。推荐默认使用此选项。"}
+                {agentType === "streaming" && "通过配置的 API 端点直接生成代码，无需额外安装。"}
                 {agentType === "opencode" && "使用 OpenCode CLI 工具生成代码。需要先在系统中安装 opencode。"}
                 {agentType === "claude" && "使用 Claude Code CLI (claude) 生成代码。需要先在系统中安装 Claude Code。"}
                 {agentType === "custom" && "使用自定义 CLI 工具生成代码。配置下面的命令和参数模板。"}
@@ -143,7 +143,7 @@ export default function SettingsDialog() {
                         style={inputStyle}
                       />
                       <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
-                        可用占位符: {`{dir}`} 工作目录, {`{contextFile}`} 上下文文件路径（提示词会自动作为最后一个参数追加）
+                        可用占位符: {`{dir}`} 工作目录（提示词会自动作为最后一个参数追加）
                       </div>
                     </div>
 
@@ -162,7 +162,7 @@ export default function SettingsDialog() {
                     marginBottom: 28,
                   }}>
                     使用 OpenCode 时，PageSprite 会调用 <code>opencode run --dir {'{dir}'} --format json {'<prompt>'}</code> 来生成代码，提示词作为最后参数传入。
-                    生成的 HTML 文件从工作目录中读取。
+                    Agent 会修改工作目录中的 <code>index.html</code> 文件，生成结果从该文件读取。
                   </div>
                 )}
 
@@ -177,7 +177,7 @@ export default function SettingsDialog() {
                     lineHeight: 1.6,
                     marginBottom: 28,
                   }}>
-                    使用 Claude Code 时，PageSprite 会调用 <code>claude {'<prompt>'}</code> 来生成代码，提示词作为最后参数传入。
+                    使用 Claude Code 时，PageSprite 会调用 <code>claude -p {'<prompt>'}</code> 来生成代码，提示词作为最后参数传入。
                     Agent 会修改工作目录中的 <code>index.html</code> 文件，生成结果从该文件读取。
                   </div>
                 )}

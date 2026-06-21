@@ -5,3 +5,7 @@ release
 .DS_Store
 tsconfig.tsbuildinfo
 src-tauri
+.env
+.env.*
+*.local
+screenshots/
