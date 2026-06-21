@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import type { Message, Annotation, AISettings, WorkspaceStatus, BoundingBox } from "../types";
 import { generateId, DEFAULT_SYSTEM_PROMPT } from "../utils/code";
 
@@ -234,16 +233,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   persistSettings: async () => {
     const { settings } = get();
     try {
-      await invoke("save_settings", {
-        settings: {
-          endpoint: settings.endpoint,
-          api_key: settings.apiKey,
-          model: settings.model,
-          system_prompt: settings.systemPrompt,
-          agent_type: settings.agentType,
-          agent_command: settings.agentCommand ?? null,
-          agent_args_template: settings.agentArgsTemplate ?? null,
-        },
+      await window.electronAPI.settings.save({
+        endpoint: settings.endpoint,
+        api_key: settings.apiKey,
+        model: settings.model,
+        system_prompt: settings.systemPrompt,
+        agent_type: settings.agentType,
+        agent_command: settings.agentCommand ?? null,
+        agent_args_template: settings.agentArgsTemplate ?? null,
       });
     } catch (e) {
       console.error("Failed to persist settings:", e);
@@ -254,16 +251,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadWorkspace: async () => {
     try {
-      const data = await invoke<{
+      const data = await window.electronAPI.workspace.load() as {
         annotations: Annotation[];
         messages: Message[];
         generatedCode: string | null;
-      } | null>("load_workspace");
+        revisionHistory?: Record<string, string[]>;
+      } | null;
       if (data) {
         set({
           annotations: data.annotations,
           messages: data.messages,
           generatedCode: data.generatedCode ?? undefined,
+          revisionHistory: data.revisionHistory ?? {},
           workspaceStatus: data.annotations.length > 0 ? "ready" : "empty",
         });
       }
@@ -273,11 +272,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   reset: () => {
-    // Clear tmp dir on Rust side
-    invoke("clear_temp_dir").catch(() => {});
-    // Save empty workspace
-    invoke("save_workspace", {
-      data: { annotations: [], messages: [], generatedCode: null, updatedAt: Date.now() },
+    window.electronAPI.workspace.clearTemp().catch(() => {});
+    window.electronAPI.workspace.save({
+      annotations: [], messages: [], generatedCode: null, revisionHistory: {}, updatedAt: Date.now(),
     }).catch(() => {});
     set({
       messages: [],
@@ -307,13 +304,12 @@ function schedulePersist() {
       schedulePersist();
       return;
     }
-    invoke("save_workspace", {
-      data: {
-        annotations: s.annotations,
-        messages: s.messages,
-        generatedCode: s.generatedCode ?? null,
-        updatedAt: Date.now(),
-      },
+    window.electronAPI.workspace.save({
+      annotations: s.annotations,
+      messages: s.messages,
+      generatedCode: s.generatedCode ?? null,
+      revisionHistory: s.revisionHistory,
+      updatedAt: Date.now(),
     }).catch((e) => console.error("Auto-save failed:", e));
   }, 800);
 }
@@ -330,13 +326,12 @@ export function startAutoPersist() {
  */
 export function saveWorkspaceNow() {
   const s = useChatStore.getState();
-  invoke("save_workspace", {
-    data: {
-      annotations: s.annotations,
-      messages: s.messages,
-      generatedCode: s.generatedCode ?? null,
-      updatedAt: Date.now(),
-    },
+  window.electronAPI.workspace.save({
+    annotations: s.annotations,
+    messages: s.messages,
+    generatedCode: s.generatedCode ?? null,
+    revisionHistory: s.revisionHistory,
+    updatedAt: Date.now(),
   }).catch((e) => console.error("Save failed:", e));
 }
 

@@ -23,20 +23,18 @@ Multiple generation backends are supported:
 ## Requirements
 
 - Node.js 20+
-- Rust toolchain (for building from source)
-- [Tauri 2 system dependencies](https://v2.tauri.app/start/prerequisites/)
 
 ## Development
 
 ```bash
 npm install
-npm run tauri:dev    # Launch Tauri dev window with HMR
-npm run tauri:build  # Production build (creates platform installer)
+npm run electron:dev    # Launch Electron dev window with HMR
+npm run electron:build  # Production build (creates platform installer)
 ```
 
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite, Zustand v5, OGL (WebGL)
-- **Backend**: Tauri 2, Rust, tokio, reqwest (SSE proxy)
+- **Backend**: Electron, Node.js (IPC + streaming AI client)
 - **AI**: OpenAI-compatible streaming API, CLI agent integration
 - **Build**: GitHub Actions CI (macOS, Windows, Linux)

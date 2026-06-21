@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useChatStore } from "../stores/chatStore";
 
 /**
@@ -13,8 +12,8 @@ async function generate(
 ): Promise<string> {
   const { settings } = useChatStore.getState();
 
-  const html = await invoke<string>("run_agent_generate", {
-    config: {
+  const html = await window.electronAPI.agent.generate(
+    {
       rect_id: rectId,
       prompt,
       existing_code: existingCode ?? null,
@@ -23,13 +22,13 @@ async function generate(
       args_template: settings.agentArgsTemplate ?? null,
       history: history ?? null,
     },
-    settings: {
+    {
       endpoint: settings.endpoint,
       api_key: settings.apiKey,
       model: settings.model,
       system_prompt: settings.systemPrompt,
     },
-  });
+  );
   return html;
 }
 

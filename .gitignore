@@ -1,5 +1,7 @@
 node_modules
 dist
-src-tauri/target
+release
 *.log
 .DS_Store
+tsconfig.tsbuildinfo
+src-tauri

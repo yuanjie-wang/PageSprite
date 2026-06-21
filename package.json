@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:1420 && electron .\"",
+    "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.17.0",
     "ogl": "^1.0.11",
@@ -24,11 +24,38 @@
     "zustand": "^5.0.5"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.2.3",
+    "electron": "^42.4.1",
+    "electron-builder": "^25.1.0",
     "typescript": "~5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.pagesprite.desktop",
+    "productName": "PageSprite",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "nsis": {
+      "installMode": "currentUser"
+    }
   }
 }

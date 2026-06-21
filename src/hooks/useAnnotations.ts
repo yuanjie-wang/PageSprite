@@ -1,7 +1,6 @@
 import { useRef, useCallback, useState } from "react";
 import { useChatStore } from "../stores/chatStore";
 import { generateId } from "../utils/code";
-import { invoke } from "@tauri-apps/api/core";
 import type { Annotation, ToolType, Point } from "../types";
 
 interface PendingText {
@@ -470,7 +469,7 @@ export function useAnnotations(
       if (annotation.type === "rect" && annotation.boundingBox) {
         const bb = annotation.boundingBox;
         // Pre-create work directory + index.html for CLI agents
-        invoke("prepare_work_dir", { rectId: annotation.id, existingCode: null })
+        window.electronAPI.agent.prepareWorkDir(annotation.id, null)
           .catch((e) => console.warn("[prepare_work_dir]", e));
         setPendingRects((prev) => [
           ...prev,

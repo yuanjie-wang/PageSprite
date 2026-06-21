@@ -39,8 +39,8 @@ export default function SettingsDialog() {
       model,
       systemPrompt,
       agentType,
-      agentCommand: agentCommand || undefined,
-      agentArgsTemplate: agentArgsTemplate || undefined,
+      agentCommand: agentType === "custom" ? (agentCommand || undefined) : undefined,
+      agentArgsTemplate: agentType === "custom" ? (agentArgsTemplate || undefined) : undefined,
     });
     persistSettings();
 
@@ -95,7 +95,7 @@ export default function SettingsDialog() {
         {/* Tabs */}
         <div style={{ display: "flex", gap: 0, marginBottom: 28 }}>
           <button style={tabStyle("agent")} onClick={() => setActiveTab("agent")}>Agent 设置</button>
-          <button style={tabStyle("systemPrompt")} onClick={() => setActiveTab("systemPrompt")}>系统提示词</button>
+          <button style={tabStyle("systemPrompt")} onClick={() => setActiveTab("systemPrompt")}>风格偏好</button>
         </div>
 
         {activeTab === "agent" && (
@@ -229,7 +229,10 @@ export default function SettingsDialog() {
 
         {activeTab === "systemPrompt" && (
           <div style={{ marginBottom: 28 }}>
-            <label style={labelStyle}>System Prompt</label>
+            <label style={labelStyle}>风格偏好</label>
+            <div style={{ fontSize: 11, color: "#888", marginTop: -2, marginBottom: 8, lineHeight: 1.5 }}>
+              控制 AI 输出的视觉风格，会追加到固定的系统提示词之后。留空则使用默认风格。
+            </div>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}

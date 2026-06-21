@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import Layout from "./components/Layout";
 import SettingsDialog from "./components/SettingsDialog";
 import { useChatStore, startAutoPersist, loadSavedWorkspace } from "./stores/chatStore";
+import { setFontAwesomeCSS } from "./utils/code";
 
 function App() {
   const updateSettings = useChatStore((s) => s.updateSettings);
@@ -11,15 +11,7 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const settings = await invoke<{
-          endpoint: string;
-          api_key: string;
-          model: string;
-          system_prompt: string;
-          agent_type?: string;
-          agent_command?: string | null;
-          agent_args_template?: string | null;
-        }>("load_settings");
+        const settings = await window.electronAPI.settings.load();
         updateSettings({
           endpoint: settings.endpoint,
           apiKey: settings.api_key,
@@ -32,6 +24,14 @@ function App() {
 
       } catch {
         // Use defaults
+      }
+
+      // Load Font Awesome CSS from main process (base64-embedded, no network needed)
+      try {
+        const faCSS = await window.electronAPI.assets.getFontAwesomeCSS();
+        if (faCSS) setFontAwesomeCSS(faCSS);
+      } catch {
+        // Font Awesome not available — proceed without it
       }
 
       // Load saved workspace (annotations, messages, etc.)

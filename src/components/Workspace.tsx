@@ -7,12 +7,14 @@ import { useAgentManager } from "../hooks/useAgentManager";
 import { saveWorkspaceNow } from "../stores/chatStore";
 import Toolbar from "./Toolbar";
 import ErrorBoundary from "./ErrorBoundary";
-import { injectScrollScript, wrapRectContent } from "../utils/code";
+import { injectScrollScript, wrapRectContent, injectFontAwesomeCSS } from "../utils/code";
 import Grainient from "./Grainient";
 import { Z_INDEX } from "../utils/zIndex";
 import { snapMove, snapResize } from "../utils/snap";
 import type { Annotation, ToolType, SnapLine } from "../types";
-import { TriangleAlert, Sparkles, Square, Circle, Pen, ArrowUpRight, Download, Trash2, FileText, ImageIcon } from "lucide-react";
+import { TriangleAlert, Sparkles } from "lucide-react";
+import LeftAnnotationToolbar from "./LeftAnnotationToolbar";
+import ZoomControls from "./ZoomControls";
 
 /**
  * Detects whether a keydown event is part of an active IME composition.
@@ -31,6 +33,9 @@ const BLANK_HTML =
   '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh}</style></head><body></body></html>';
 const PER_RECT_BLANK =
   '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;min-height:100vh;background:#fff}</style></head><body></body></html>';
+
+/** Incremented per rect to force iframe remount on reset */
+const iframeResetVersions: Record<string, number> = {};
 
 /** Truncate text to at most `max` units where a CJK character = 1 unit and an English word = 1 unit. */
 function summarizeTitle(text: string, max: number): string {
@@ -267,7 +272,7 @@ function RegionConfig({
   );
   const childAnnotations = useChatStore(
     useShallow((s) =>
-      s.annotations.filter((a) => a.parentId === annotationId),
+      s.annotations.filter((a) => a.parentId === annotationId && a.text),
     ),
   );
   const canGenerate = prompt.trim() || (!!annotation?.generatedCode && childAnnotations.length > 0);
@@ -968,6 +973,12 @@ function RectTitleBar({
   );
 }
 
+/**
+ * Captures mousedown on the capture phase and deselects the rect unless the
+ * target is a data-rect-control element (toolbar, handles, title bar, etc.).
+ * This prevents accidental deselection when clicking buttons or resize handles
+ * that happen to sit outside the rect boundary.
+ */
 function BackgroundDeselect({ onDeselect }: { onDeselect: () => void }) {
   const savedRef = useRef(onDeselect);
   savedRef.current = onDeselect;
@@ -1012,8 +1023,6 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
   const docW = annotation.boundingBox?.width ?? vp.width;
   const docH = annotation.boundingBox?.height ?? vp.height;
 
-  const [maskActive, setMaskActive] = useState(true);
-
   return (
     <div
       style={{
@@ -1041,18 +1050,16 @@ function PerRectFrame({ annotation, currentTool, iframeMap, zIndex, vp, zoom }: 
           display: "block",
         }}
       />
-      {/* Transparent mask: intercepts wheel/pointer events so they don't reach iframe content.
-          In pan mode, always active — WKWebView's NSScrollView won't capture two-finger swipe.
-          In cursor mode, click to deactivate, mouse leave to reactivate. */}
+      {/* Transparent mask: prevents scroll/pointer events from interfering with canvas interaction.
+          In pan mode, blocks events so two-finger swipe pans the canvas instead of scrolling iframe content.
+          In cursor mode, lets all events pass through so users can directly interact with generated content. */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background: "transparent",
-          pointerEvents: currentTool === "pan" ? "auto" : (maskActive ? "auto" : "none"),
+          pointerEvents: currentTool === "pan" ? "auto" : "none",
         }}
-        onClick={() => setMaskActive(false)}
-        onMouseLeave={() => setMaskActive(true)}
       />
     </div>
   );
@@ -1077,7 +1084,7 @@ function RectAnnotationCanvas({ annotationId, zoom, panX, panY, scrollOffset, zI
   );
   const childAnnotations = useChatStore(
     useShallow((s) =>
-      s.annotations.filter((a) => a.parentId === annotationId),
+      s.annotations.filter((a) => a.parentId === annotationId && a.text),
     ),
   );
 
@@ -1170,10 +1177,6 @@ function WorkspaceContent() {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.6);
   const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
-  const [exportOpen, setExportOpen] = useState(false);
-  const [leftColorOpen, setLeftColorOpen] = useState(false);
-  const leftColorRef = useRef<HTMLDivElement>(null);
-  const LEFT_COLORS = ["#ff0000", "#ff8800", "#ffdd00", "#00cc44", "#0088ff", "#8800ff", "#000000"];
   const [selectedRectId, setSelectedRectId] = useState<string | null>(null);
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 
@@ -1208,10 +1211,11 @@ function WorkspaceContent() {
     [annotations],
   );
 
-  // Per-rect z-index: later rects stack higher, consistent for iframe + title bar + overlay.
+  // Per-rect z-index: stride of 4 groups each rect's layers together.
+  //   iframe=base+0, canvas=base+1, titleBar=base+2, (free=base+3)
   const allRectZIndex = useMemo(() => {
     const map = new Map<string, number>();
-    allRects.forEach((a, i) => map.set(a.id, Z_INDEX.PER_RECT_BASE + i * 2));
+    allRects.forEach((a, i) => map.set(a.id, Z_INDEX.PER_RECT_BASE + i * 4));
     return map;
   }, [allRects]);
 
@@ -1221,23 +1225,6 @@ function WorkspaceContent() {
       setSelectedRectId(null);
     }
   }, [allRects, selectedRectId]);
-
-  // Close popups when selection changes
-  useEffect(() => {
-    setExportOpen(false);
-    setLeftColorOpen(false);
-  }, [selectedRectId]);
-
-  // Click-outside handler for left annotation color picker
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (leftColorRef.current && !leftColorRef.current.contains(e.target as Node)) {
-        setLeftColorOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   // Local overlay ID list — decoupled from store for exit animation control.
   // Additions are immediate, removals are delayed by 650ms so the exit
@@ -1268,14 +1255,14 @@ function WorkspaceContent() {
   );
 
 
+  // Refs for imperative canvas control — bypass React batching during drag/pan for 60fps redraws
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
-
   const transformRef = useRef<ViewTransform | null>(null);
-  transformRef.current = { panX: panOffset.x, panY: panOffset.y, zoom };
-
-  // Ref for imperative pan updates so canvas redraws per frame during drag
   const panOffsetRef = useRef(panOffset);
+
+  transformRef.current = { panX: panOffset.x, panY: panOffset.y, zoom };
+  panOffsetRef.current = panOffset;
   panOffsetRef.current = panOffset;
 
   const agentManager = useAgentManager();
@@ -1438,15 +1425,6 @@ function WorkspaceContent() {
     return () => window.removeEventListener("message", handler);
   }, [redrawAnnotations]);
 
-  // Save workspace to disk whenever annotations change (debounced)
-  const saveTimerRef = useRef<number>(undefined);
-  useEffect(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      saveWorkspaceNow();
-    }, 1000);
-  }, [annotations]);
-
   // Save on window close
   useEffect(() => {
     const onClose = () => saveWorkspaceNow();
@@ -1474,6 +1452,19 @@ function WorkspaceContent() {
     return hash;
   }, [generatedCode]);
 
+  /**
+   * Undo removes the last annotation and pushes it onto redoStackRef.
+   * Redo pops from the stack and re-inserts via addAnnotation (which triggers re-render).
+   *
+   * We use useRef for the stack (no re-render on push/pop) and a Zustand subscription
+   * to detect new annotations added by the user (not via redo). When a new annotation
+   * arrives, the redo stack is cleared — standard undo/redo semantics where new actions
+   * invalidate the redo history.
+   *
+   * isRedoingRef prevents the subscription from clearing the stack when handleRedo
+   * calls addAnnotation. It's set true before the call, and the subscription resets it
+   * after processing the length change.
+   */
   const redoStackRef = useRef<Annotation[]>([]);
   const isRedoingRef = useRef(false);
 
@@ -1545,9 +1536,9 @@ function WorkspaceContent() {
         contentType === "web" ? " Design it as a web page with standard web layout and styling." :
         " No specific style constraints — generate freely.";
 
-      // Collect child annotations as visual context
+      // Collect child annotations as visual context (skip empty ones with no note)
       const childAnnotations = store.annotations.filter(
-        (a) => a.parentId === annotationId,
+        (a) => a.parentId === annotationId && a.text,
       );
       let childContext = "";
       if (childAnnotations.length > 0) {
@@ -1591,22 +1582,7 @@ function WorkspaceContent() {
       const isRevision = !!ann?.generatedCode;
       let fullPrompt = (isRevision ? `Revise` : `Generate`) + ` a self-contained HTML snippet that fills its container (${dims}px). The output must not include html/head/body tags — only content that fills the container. Use relative units (%, vw, vh), flexbox/grid, and avoid fixed pixel dimensions so the content adapts when the container is resized.${styleGuide} User's request: ${prompt}${childContext}`;
 
-      // Revision history: CLI agents get it as text, streaming gets it as structured messages
       const revHistory = store.revisionHistory[annotationId];
-      if (revHistory && revHistory.length > 0 && store.settings.agentType !== "streaming") {
-        const revLines = revHistory.map((p, i) => `${i + 1}. ${p}`).join("\n");
-        fullPrompt = `Revision history for this region:\n${revLines}\n\n---\n\n${fullPrompt}`;
-      }
-
-      // Include existing code as context for revisions
-      if (ann?.generatedCode) {
-        fullPrompt = `Current HTML code:\n\`\`\`html\n${ann.generatedCode}\n\`\`\`\n\nModify the current HTML based on the following request. Preserve the overall structure and only make the requested changes.\n\n---\n\n${fullPrompt}`;
-      }
-
-      // Guide CLI agents to modify the pre-existing index.html in their working directory
-      if (store.settings.agentType !== "streaming") {
-        fullPrompt += `\n\nA file named index.html already exists in your working directory. Modify this file with your complete generated HTML output, replacing its contents entirely. Do NOT create any new files.`;
-      }
 
       // Use agent manager
       console.log(`[PATH] >>> ${store.settings.agentType} [${annotationId.slice(0,8)}] dims=${dims}`);
@@ -1644,7 +1620,7 @@ function WorkspaceContent() {
     const ann = useChatStore.getState().annotations.find(a => a.id === id);
     if (!ann?.generatedCode) return;
     const html = ann.generatedCode;
-    const full = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+    const full = injectFontAwesomeCSS(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`);
     const blob = new Blob([full], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1652,7 +1628,6 @@ function WorkspaceContent() {
     a.download = `pagesprite-${id.slice(0, 8)}.html`;
     a.click();
     URL.revokeObjectURL(url);
-    setExportOpen(false);
   }, []);
 
   const handleExportImage = useCallback(async (id: string) => {
@@ -1690,8 +1665,15 @@ function WorkspaceContent() {
     } finally {
       document.body.removeChild(iframe);
     }
-    setExportOpen(false);
   }, []);
+
+  const handleResetRect = useCallback(() => {
+    const id = selectedRectId;
+    if (!id) return;
+    // Force iframe to remount with original generatedCode (reloads srcdoc from scratch)
+    iframeResetVersions[id] = (iframeResetVersions[id] || 0) + 1;
+    setSelectedRectId(null);
+  }, [selectedRectId]);
 
   const handleRectActivate = useCallback((id: string) => {
     setCurrentTool("cursor");
@@ -1748,13 +1730,12 @@ function WorkspaceContent() {
 
   // Gesture zoom via Ctrl/Cmd+scroll, two-finger pan via plain wheel
   // Window capture phase catches events before iframes consume them.
-  // No preventDefault() here — the container has overflow:hidden so no visible scroll.
+  // preventDefault is only called for zoom (ctrlKey) — plain wheel scroll is
+  // not prevented; overflow:auto on the container handles visible scroll naturally.
   useEffect(() => {
     const handler = (e: WheelEvent) => {
       // When settings dialog is open, let the dialog handle scroll natively
       if (settingsOpen) return;
-      // Debug: log the event type and delta
-      console.log("[wheel]", e.deltaX, e.deltaY, e.ctrlKey, e.target);
 
       if (e.ctrlKey || e.metaKey) {
         // Pinch zoom — prevent default to avoid browser zoom
@@ -1826,7 +1807,7 @@ function WorkspaceContent() {
         style={{
           position: "absolute",
           inset: 0,
-          overflow: "hidden",
+          overflow: "auto",
           overscrollBehavior: "none",
           userSelect: "none",
           WebkitUserSelect: "none",
@@ -1954,6 +1935,7 @@ function WorkspaceContent() {
                       Generating&hellip;
                     </span>
                   </div>
+
                 </div>
               );
             })}
@@ -2081,7 +2063,7 @@ function WorkspaceContent() {
               };
               return (
                 <PerRectFrame
-                  key={ann.id + (ann.generatedCode?.slice(0, 40) || '')}
+                  key={ann.id + (ann.generatedCode?.slice(0, 40) || '') + '-v' + (iframeResetVersions[ann.id] || 0)}
                   annotation={ann}
                   currentTool={currentTool}
                   iframeMap={perRectIframeMapRef.current}
@@ -2109,7 +2091,9 @@ function WorkspaceContent() {
             })}
 
             {/* Title bars for ALL rects (pending / generating / with code) — always movable */}
-            {allRects.map((ann) => (
+            {allRects.map((ann) => {
+              const zi = allRectZIndex.get(ann.id) ?? 10;
+              return (
               <RectTitleBar
                 key={`tb-${ann.id}`}
                 annotationId={ann.id}
@@ -2122,10 +2106,11 @@ function WorkspaceContent() {
                 onSetIFramePE={setRectIframePE}
                 onActivate={handleRectActivate}
                 onSnapChange={setSnapLines}
-                zIndex={495}
+                zIndex={zi + 2}
                 currentTool={currentTool}
               />
-            ))}
+              );
+            })}
 
             {/* Selection UI — handles + badge + deselect, only in cursor mode */}
             {currentTool === "cursor" && (
@@ -2152,94 +2137,7 @@ function WorkspaceContent() {
               <BackgroundDeselect onDeselect={() => setSelectedRectId(null)} />
             )}
 
-            {/* Zoom controls */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 16,
-                right: 16,
-                zIndex: Z_INDEX.ZOOM_CONTROLS,
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                background: "rgba(240, 240, 240, 0.6)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(0, 0, 0, 0.06)",
-                borderRadius: 12,
-                padding: 4,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-              }}
-            >
-              <button
-                onClick={() => setZoom((z) => Math.max(0.1, +(z - 0.1).toFixed(2)))}
-                title="缩小"
-                style={{
-                  width: 28,
-                  height: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "none",
-                  borderRadius: 4,
-                  background: "transparent",
-                  color: "#555",
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                −
-              </button>
-              <span
-                style={{
-                  minWidth: 44,
-                  textAlign: "center",
-                  fontSize: 12,
-                  color: "#555",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {Math.round(zoom * 100)}%
-              </span>
-              <button
-                onClick={() => setZoom((z) => Math.min(5, +(z + 0.1).toFixed(2)))}
-                title="放大"
-                style={{
-                  width: 28,
-                  height: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "none",
-                  borderRadius: 4,
-                  background: "transparent",
-                  color: "#555",
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                +
-              </button>
-              <div style={{ width: 1, height: 16, background: "#d4d4d4", margin: "0 4px" }} />
-              <button
-                onClick={() => setZoom(1)}
-                title="重置缩放"
-                style={{
-                  height: 28,
-                  padding: "0 8px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: "transparent",
-                  color: "#555",
-                  fontSize: 11,
-                  cursor: "pointer",
-                }}
-              >
-                1:1
-              </button>
-            </div>
+            <ZoomControls zoom={zoom} onZoomChange={setZoom} />
 
             {/* Snap alignment guides */}
             {snapLines.map((line, i) => {
@@ -2275,265 +2173,22 @@ function WorkspaceContent() {
               );
             })}
 
-            {/* Left annotation toolbar — attached to the left edge of the selected rect, moves with it */}
-            {(() => {
-              if (!selectedRectId) return null;
-              const selAnn = allRects.find(a => a.id === selectedRectId);
-              if (!selAnn?.boundingBox) return null;
-              const b = selAnn.boundingBox;
-              const vpX = (b.x - scrollOffset.x) * zoom + panX;
-              const vpY = (b.y - scrollOffset.y) * zoom + panY;
-              const vpCenterY = vpY + b.height * zoom / 2;
-              return (
-                <div data-rect-control="true" style={{
-                  position: "absolute",
-                  left: vpX - 50,
-                  top: vpCenterY,
-                  transform: "translateY(-50%)",
-                  zIndex: Z_INDEX.LEFT_TOOLBAR,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: 6,
-                  background: "rgba(240, 240, 240, 0.6)",
-                  backdropFilter: "blur(16px)",
-                  WebkitBackdropFilter: "blur(16px)",
-                  border: "1px solid rgba(0, 0, 0, 0.06)",
-                  borderRadius: 12,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                }}>
-                  {/* Rectangle annotation */}
-                  <button
-                    data-rect-control="true"
-                    onClick={() => setCurrentTool("rectangle")}
-                    title="矩形"
-                    style={{
-                      width: 30, height: 30,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "none", borderRadius: 6,
-                      background: currentTool === "rectangle" ? "#d0d0d0" : "transparent",
-                      color: currentTool === "rectangle" ? "#222" : "#666",
-                    }}
-                  >
-                    <Square size={15} />
-                  </button>
-                  {/* Ellipse annotation */}
-                  <button
-                    data-rect-control="true"
-                    onClick={() => setCurrentTool("ellipse")}
-                    title="圆形"
-                    style={{
-                      width: 30, height: 30,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "none", borderRadius: 6,
-                      background: currentTool === "ellipse" ? "#d0d0d0" : "transparent",
-                      color: currentTool === "ellipse" ? "#222" : "#666",
-                    }}
-                  >
-                    <Circle size={15} />
-                  </button>
-                  {/* Pen */}
-                  <button
-                    data-rect-control="true"
-                    onClick={() => setCurrentTool("pen")}
-                    title="画笔"
-                    style={{
-                      width: 30, height: 30,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "none", borderRadius: 6,
-                      background: currentTool === "pen" ? "#d0d0d0" : "transparent",
-                      color: currentTool === "pen" ? "#222" : "#666",
-                    }}
-                  >
-                    <Pen size={15} />
-                  </button>
-                  {/* Arrow */}
-                  <button
-                    data-rect-control="true"
-                    onClick={() => setCurrentTool("arrow")}
-                    title="箭头"
-                    style={{
-                      width: 30, height: 30,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "none", borderRadius: 6,
-                      background: currentTool === "arrow" ? "#d0d0d0" : "transparent",
-                      color: currentTool === "arrow" ? "#222" : "#666",
-                    }}
-                  >
-                    <ArrowUpRight size={15} />
-                  </button>
-
-                  <div style={{ width: "80%", height: 1, background: "#d4d4d4", margin: "3px 0" }} />
-
-                  {/* Color picker */}
-                  <div ref={leftColorRef} style={{ position: "relative" }}>
-                    <button
-                      data-rect-control="true"
-                      onClick={() => setLeftColorOpen((v) => !v)}
-                      onMouseDown={(e) => e.nativeEvent.stopPropagation()}
-                      title="颜色"
-                      style={{
-                        width: 16,
-                        height: 16,
-                        minWidth: 0,
-                        padding: 0,
-                        marginTop: 2,
-                        marginBottom: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: "1.5px solid rgba(0,0,0,0.15)",
-                        borderRadius: "50%",
-                        background: currentColor,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    />
-                    {leftColorOpen && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: "100%",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          marginLeft: 8,
-                          display: "flex",
-                          gap: 3,
-                          padding: 6,
-                          background: "rgba(240, 240, 240, 0.85)",
-                          backdropFilter: "blur(16px)",
-                          WebkitBackdropFilter: "blur(16px)",
-                          border: "1px solid rgba(0,0,0,0.08)",
-                          borderRadius: 10,
-                          boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                          zIndex: 20,
-                        }}
-                      >
-                        {LEFT_COLORS.map((color) => (
-                          <button
-                            key={color}
-                            onClick={() => {
-                              setCurrentColor(color);
-                              setLeftColorOpen(false);
-                            }}
-                            title={color}
-                            style={{
-                              width: 16,
-                              height: 16,
-                              borderRadius: "50%",
-                              border: currentColor === color ? "1.5px solid #333" : "1.5px solid transparent",
-                              background: color,
-                              cursor: "pointer",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ width: "80%", height: 1, background: "#d4d4d4", margin: "3px 0" }} />
-
-                  <div style={{ position: "relative" }}>
-                    <button
-                      onClick={() => { if (!selAnn.generatedCode) return; setExportOpen((v) => !v); }}
-                      title="导出"
-                      style={{
-                        width: 30, height: 30,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "none", borderRadius: 6,
-                        background: "transparent",
-                        color: selAnn.generatedCode ? "#555" : "#bbb",
-                        opacity: selAnn.generatedCode ? 1 : 0.4,
-                        cursor: selAnn.generatedCode ? "pointer" : "default",
-                      }}
-                    >
-                      <Download size={15} />
-                    </button>
-                    {exportOpen && selAnn && (
-                      <>
-                        <div
-                          style={{ position: "fixed", inset: 0, zIndex: 19 }}
-                          onClick={() => setExportOpen(false)}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: "50%", bottom: "100%",
-                            transform: "translateX(-50%)",
-                            marginBottom: 6,
-                            background: "rgba(255,255,255,0.95)",
-                            backdropFilter: "blur(12px)",
-                            WebkitBackdropFilter: "blur(12px)",
-                            border: "1px solid rgba(0,0,0,0.08)",
-                            borderRadius: 8,
-                            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                            zIndex: 20,
-                            display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <button
-                            onClick={() => handleExportRect(selAnn.id)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 6,
-                              padding: "6px 12px",
-                              border: "none",
-                              background: "transparent",
-                              color: "#444",
-                              fontSize: 12,
-                              cursor: "pointer",
-                              whiteSpace: "nowrap",
-                              fontFamily: "inherit",
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                          >
-                            <FileText size={13} />
-                            下载 HTML
-                          </button>
-                          <button
-                            onClick={() => handleExportImage(selAnn.id)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 6,
-                              padding: "6px 12px",
-                              border: "none",
-                              borderTop: "1px solid rgba(0,0,0,0.06)",
-                              background: "transparent",
-                              color: "#444",
-                              fontSize: 12,
-                              cursor: "pointer",
-                              whiteSpace: "nowrap",
-                              fontFamily: "inherit",
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                          >
-                            <ImageIcon size={13} />
-                            下载图片
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => { const id = selectedRectId; if (id) handleDeleteRect(id); }}
-                    title="删除"
-                    style={{
-                      width: 30, height: 30,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "none", borderRadius: 6,
-                      background: "transparent",
-                      color: "#ef4444",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              );
-            })()}
+            <LeftAnnotationToolbar
+              selectedRectId={selectedRectId}
+              allRects={allRects}
+              zoom={zoom}
+              panX={panX}
+              panY={panY}
+              scrollOffset={scrollOffset}
+              currentTool={currentTool}
+              onToolChange={setCurrentTool}
+              currentColor={currentColor}
+              onColorChange={setCurrentColor}
+              onResetRect={handleResetRect}
+              onExportRect={handleExportRect}
+              onExportImage={handleExportImage}
+              onDeleteRect={handleDeleteRect}
+            />
 
           </>
       </div>
