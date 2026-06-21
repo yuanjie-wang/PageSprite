@@ -55,7 +55,7 @@
       "target": "AppImage"
     },
     "nsis": {
-      "installMode": "currentUser"
+      "perMachine": false
     }
   }
 }
