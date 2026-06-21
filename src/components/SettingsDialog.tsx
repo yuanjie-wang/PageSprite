@@ -171,8 +171,8 @@ export default function SettingsDialog() {
                     lineHeight: 1.6,
                     marginBottom: 28,
                   }}>
-                    使用 OpenCode 时，PageSprite 会调用 <code>opencode run --dir {'{dir}'} --format json {'<prompt>'}</code> 来生成代码，提示词作为最后参数传入。
-                    Agent 会修改工作目录中的 <code>index.html</code> 文件，生成结果从该文件读取。
+                    {t("opencodeDescBefore")} <code>opencode run --dir {'{dir}'} --format json {'<prompt>'}</code> {t("opencodeDescAfter")}
+                    {t("agentReadsBefore")} <code>index.html</code> {t("agentReadsAfter")}
                   </div>
                 )}
 
@@ -187,8 +187,8 @@ export default function SettingsDialog() {
                     lineHeight: 1.6,
                     marginBottom: 28,
                   }}>
-                    使用 Claude Code 时，PageSprite 会调用 <code>claude -p {'<prompt>'}</code> 来生成代码，提示词作为最后参数传入。
-                    Agent 会修改工作目录中的 <code>index.html</code> 文件，生成结果从该文件读取。
+                    {t("claudeDescBefore")} <code>claude -p {'<prompt>'}</code> {t("claudeDescAfter")}
+                    {t("agentReadsBefore")} <code>index.html</code> {t("agentReadsAfter")}
                   </div>
                 )}
               </>
