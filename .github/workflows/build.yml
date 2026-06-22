@@ -8,7 +8,7 @@ permissions:
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+  tags: ["v*"]
   workflow_dispatch:
 
 jobs:
@@ -22,6 +22,7 @@ jobs:
           - os: macos-14
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
 
@@ -33,14 +34,23 @@ jobs:
 
       - run: npm ci
 
-      - name: Build
+      - name: Build electron app
         run: npm run electron:build -- --publish=never
 
-      - name: Upload artifacts
+      # 方案A核心：按系统打包成单一压缩包
+      - name: Package release to single zip
+        shell: bash
+        run: |
+          ZIP_NAME=release-${{ matrix.os }}.zip
+          zip -r "$ZIP_NAME" release/
+          echo "Created archive: $ZIP_NAME"
+
+      # 仅上传压缩包，不再上传零散安装文件
+      - name: Upload single zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: pagesprite-${{ matrix.os }}
-          path: release/
+          path: release-${{ matrix.os }}.zip
           retention-days: 7
 
   publish:
@@ -52,14 +62,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
+      - name: Download all zip artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./dist
 
-      - name: Pre wait to avoid secondary rate limit
-        run: sleep 12
+      # 前置长等待，释放删除操作的API额度
+      - name: Cool down before release operation
+        run: sleep 15
 
+      # 删除旧tag与旧Release，避免资产冲突
       - name: Purge old release & tag
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
@@ -72,7 +84,8 @@ jobs:
           set -e
           sleep 10
 
-      - name: Create empty release
+      # 创建空Release，生成更新日志
+      - name: Create empty release draft
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -81,15 +94,16 @@ jobs:
             --generate-notes \
             --title "Release $TAG"
 
-      - name: Upload assets one by one with throttle
+      # 串行逐个上传3个zip，每个文件间隔3秒，限流自动重试
+      - name: Upload zip assets one by one
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           MAX_RETRY=3
-          DELAY_PER_FILE=2
-          find ./dist -type f | while read -r file; do
-            echo "Uploading: $file"
+          DELAY_PER_FILE=3
+          find ./dist -maxdepth 1 -name "release-*.zip" -type f | while read -r file; do
+            echo "==== Start upload $file ===="
             attempt=1
             success=0
             while [ $attempt -le $MAX_RETRY ]; do
@@ -97,13 +111,14 @@ jobs:
                 success=1
                 break
               fi
-              echo "Rate limited or failed, retry $attempt after 30s..."
+              echo "Hit rate limit, wait 30s to retry ($attempt/$MAX_RETRY)"
               sleep 30
               attempt=$((attempt + 1))
             done
             if [ $success -ne 1 ]; then
-              echo "FATAL: upload $file failed after $MAX_RETRY retries"
+              echo "ERROR: Upload $file failed after multiple retries"
               exit 1
             fi
+            echo "Upload $file success, sleep ${DELAY_PER_FILE}s..."
             sleep $DELAY_PER_FILE
           done
