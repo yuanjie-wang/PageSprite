@@ -7,8 +7,10 @@ permissions:
 
 on:
   push:
-    branches: [main]
-  tags: ["v*"]
+    branches:
+      - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -37,7 +39,7 @@ jobs:
       - name: Build electron app
         run: npm run electron:build -- --publish=never
 
-      # 方案A核心：按系统打包成单一压缩包
+      # 按系统打包成单一压缩包
       - name: Package release to single zip
         shell: bash
         run: |
@@ -45,7 +47,7 @@ jobs:
           zip -r "$ZIP_NAME" release/
           echo "Created archive: $ZIP_NAME"
 
-      # 仅上传压缩包，不再上传零散安装文件
+      # 仅上传压缩包
       - name: Upload single zip artifact
         uses: actions/upload-artifact@v4
         with:
@@ -67,11 +69,9 @@ jobs:
         with:
           path: ./dist
 
-      # 前置长等待，释放删除操作的API额度
       - name: Cool down before release operation
         run: sleep 15
 
-      # 删除旧tag与旧Release，避免资产冲突
       - name: Purge old release & tag
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
@@ -84,7 +84,6 @@ jobs:
           set -e
           sleep 10
 
-      # 创建空Release，生成更新日志
       - name: Create empty release draft
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
@@ -94,7 +93,6 @@ jobs:
             --generate-notes \
             --title "Release $TAG"
 
-      # 串行逐个上传3个zip，每个文件间隔3秒，限流自动重试
       - name: Upload zip assets one by one
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
